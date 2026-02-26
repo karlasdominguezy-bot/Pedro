@@ -32,15 +32,14 @@ if not os.path.exists(PDF_FOLDER):
 LOGO_URL = "UCELOGO.png"
 AVATAR_URL = "Pedro.png"
 
-# --- 2. FUNCIONES DE LÓGICA (Backend) ---
+# --- 2. FUNCIONES DE LÓGICA ---
 
 def get_img_as_base64(file_path):
     try:
         with open(file_path, "rb") as f:
             data = f.read()
         return base64.b64encode(data).decode()
-    except:
-        return ""
+    except: return ""
 
 def conseguir_modelo_disponible():
     try:
@@ -48,7 +47,7 @@ def conseguir_modelo_disponible():
         modelos_chat = [m for m in modelos if 'generateContent' in m.supported_generation_methods]
         if not modelos_chat: return None, "Sin modelos compatibles."
         nombres = [m.name for m in modelos_chat]
-        preferidos = ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-pro']
+        preferidos = ['models/gemini-1.5-flash', 'models/gemini-1.5-pro']
         for pref in preferidos:
             if pref in nombres: return pref, pref
         return nombres[0], nombres[0]
@@ -63,17 +62,13 @@ def guardar_archivo(uploaded_file):
 
 def eliminar_archivo(nombre_archivo):
     ruta = os.path.join(PDF_FOLDER, nombre_archivo)
-    if os.path.exists(ruta):
-        os.remove(ruta)
+    if os.path.exists(ruta): os.remove(ruta)
 
 @st.cache_resource
 def leer_pdfs_locales():
     textos, fuentes = [], []
     if not os.path.exists(PDF_FOLDER): return [], []
-
     archivos = [f for f in os.listdir(PDF_FOLDER) if f.endswith('.pdf')]
-    if not archivos: return [], []
-    
     for archivo in archivos:
         try:
             ruta_completa = os.path.join(PDF_FOLDER, archivo)
@@ -110,43 +105,24 @@ def buscar_informacion(pregunta, textos, fuentes):
 def estilos_globales():
     estilos = """
     <style>
-        ::-webkit-scrollbar { width: 8px; background: transparent; }
         .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; }
-
+        
         .footer-credits {
             position: fixed; left: 0; bottom: 0; width: 100%;
-            background-color: #ffffff; color: #444; text-align: center;
-            font-size: 11px; padding: 5px; border-top: 2px solid #C59200;
-            z-index: 99999; font-family: sans-serif;
+            background-color: #ffffff; text-align: center;
+            font-size: 11px; padding: 5px; border-top: 2px solid #C59200; z-index: 99999;
         }
         
         div[data-testid="stBottom"] { padding-bottom: 35px; background-color: transparent; }
-
-        [data-testid="stChatMessageAvatar"] { width: 40px !important; height: 40px !important; border-radius: 50% !important; }
-        [data-testid="stChatMessageAvatar"] img { object-fit: contain !important; }
-
-        [data-testid="stFileUploader"] section > div > div > span,
-        [data-testid="stFileUploader"] section > div > div > small { display: none !important; }
-        [data-testid="stFileUploader"] section > div > div::after {
-            content: "📂 Arrastra y suelta tus archivos PDF aquí";
-            display: block; font-weight: bold; color: #444; margin-bottom: 5px;
-        }
-        
-        [data-testid="stVerticalBlock"] > [style*="flex-direction: row"] { align-items: center; }
     </style>
-
     <div class="footer-credits">
-        <div style="font-weight: bold; color: #002F6C; font-size: 11px;">
-            Hecho por: Escuntar Sebástian, Lincango Santiago, Molina Jhostin, Sango Rodrigo, Rosero Ioshua.
-        </div>
-        <div style="font-size: 9px; color: #666;">
-            Proyecto Académico | Powered by Google Gemini API
-        </div>
+        <div style="font-weight: bold; color: #002F6C;">Hecho por: Escuntar Sebástian, Lincango Santiago, Molina Jhostin, Sango Rodrigo, Rosero Ioshua.</div>
+        <div style="font-size: 9px; color: #666;">Proyecto Académico | Powered by Google Gemini API</div>
     </div>
     """
     st.markdown(estilos, unsafe_allow_html=True)
 
-# --- 4. INTERFACES GRÁFICAS ---
+# --- 4. INTERFACES ---
 
 def sidebar_uce():
     with st.sidebar:
@@ -154,119 +130,98 @@ def sidebar_uce():
         st.divider()
         st.title("Navegación")
         opcion = st.radio("Ir a:", ["💬 Chat con Ing. Pedro", "📂 Gestión de Bibliografía"])
-        st.divider()
         return opcion
 
 def interfaz_gestor_archivos():
     estilos_globales()
-    col_hl, col_ht = st.columns([0.8, 5])
-    with col_hl:
-        if os.path.exists(LOGO_URL): st.image(LOGO_URL, width=90)
-    with col_ht:
-        st.header("Gestión de Bibliografía")
+    st.header("📂 Gestión de Bibliografía")
+    uploaded_files = st.file_uploader("Cargar documentos PDF", type="pdf", accept_multiple_files=True)
+    if uploaded_files:
+        if st.button("Procesar Documentos", type="primary"):
+            for f in uploaded_files: guardar_archivo(f)
+            leer_pdfs_locales.clear()
+            st.success("✅ Documentos aprendidos.")
+            st.rerun()
     
-    col_avatar, col_contenido = st.columns([1, 3])
-    with col_avatar:
-        if os.path.exists(AVATAR_URL):
-            img_b64 = get_img_as_base64(AVATAR_URL)
-            st.markdown(f'<img src="data:image/png;base64,{img_b64}" style="width:100%; max-width: 300px; border-radius:15px;">', unsafe_allow_html=True)
-            
-    with col_contenido:
-        st.info("Ayuda al Ing. Pedro a aprender subiendo los sílabos y libros aquí.") 
-        st.markdown("---") 
-        
-        col1, col2 = st.columns([1, 2]) 
-        with col1: 
-            uploaded_files = st.file_uploader("Cargar documentos PDF", type="pdf", accept_multiple_files=True) 
-            if uploaded_files: 
-                if st.button("Procesar Documentos", type="primary"): 
-                    for file in uploaded_files: guardar_archivo(file) 
-                    leer_pdfs_locales.clear()
-                    st.success("✅ Documentos aprendidos.") 
-                    st.rerun() 
-        with col2: 
-            st.subheader("📚 Memoria:") 
-            archivos = os.listdir(PDF_FOLDER) 
-            if not archivos: 
-                st.warning("Memoria vacía.") 
-            else: 
-                for f in archivos: 
-                    c1, c2 = st.columns([4, 1]) 
-                    c1.text(f"📄 {f}") 
-                    if c2.button("🗑️", key=f): 
-                        eliminar_archivo(f) 
-                        leer_pdfs_locales.clear()
-                        st.rerun() 
+    archivos = os.listdir(PDF_FOLDER)
+    for f in archivos:
+        c1, c2 = st.columns([4, 1])
+        c1.text(f"📄 {f}")
+        if c2.button("🗑️", key=f):
+            eliminar_archivo(f)
+            leer_pdfs_locales.clear()
+            st.rerun()
 
 def interfaz_chat():
     estilos_globales()
-    col_izquierda, col_derecha = st.columns([1.2, 3])
     
-    with col_izquierda:
-        if os.path.exists(AVATAR_URL):
-            img_b64 = get_img_as_base64(AVATAR_URL)
-            st.markdown(f"""
-                <div style="display: flex; justify-content: center; align-items: center; height: 85vh;">
-                    <img src="data:image/png;base64,{img_b64}" style="width: 100%; max-width: 400px; border-radius: 20px;">
-                </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown("🤖")
+    # === ENCABEZADO UNIFICADO: Logo UCE | Título | Avatar Pedro ===
+    col_logo, col_titulo, col_avatar_head = st.columns([1.2, 3, 1.2])
 
-    with col_derecha:
-        col_hl, col_ht = st.columns([0.6, 5]) 
-        with col_hl:
-            if os.path.exists(LOGO_URL): st.image(LOGO_URL, width=80) 
-        with col_ht:
-            st.markdown("""
-                <h2 style='margin-bottom: 0px; padding-top: 0px; color: #002F6C;'>💬 Asistente Virtual</h2>
-                <p style='margin-top: 0px; color: gray; font-size: 14px;'>Ing. Pedro - Tu Tutor Virtual de la FICA</p>
-            """, unsafe_allow_html=True)
-        
+    with col_logo:
+        if os.path.exists(LOGO_URL):
+            st.markdown('<div style="margin-top: 15px;">', unsafe_allow_html=True)
+            st.image(LOGO_URL, width=150)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    with col_titulo:
         st.markdown("""
-        <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 14px;">
-            <strong>🦅 ¡Hola compañero! Soy el Ing. Pedro.</strong><br>
-            ¿En qué puedo ayudarte hoy? Puedes hacerme consultas generales o sobre los documentos cargados.
-        </div>
+            <div style="text-align: center; padding-top: 30px;">
+                <h1 style='margin-bottom: 0px; color: #002F6C; font-size: 2.5rem;'>Asistente Virtual</h1>
+                <p style='margin-top: 0px; color: gray; font-size: 16px;'>Ing. Pedro - Tu Tutor Virtual de la FICA</p>
+            </div>
         """, unsafe_allow_html=True)
 
-        contenedor_chat = st.container(height=380, border=True)
-        modelo, _ = conseguir_modelo_disponible()
-        
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
+    with col_avatar_head:
+        if os.path.exists(AVATAR_URL):
+            st.markdown('<div style="margin-top: 10px;">', unsafe_allow_html=True)
+            st.image(AVATAR_URL, width=160)
+            st.markdown('</div>', unsafe_allow_html=True)
 
+    # === BLOQUE DE BIENVENIDA RECTIFICADO ===
+    st.markdown("""
+    <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; margin-bottom: 15px; font-size: 15px; border-left: 5px solid #C59200;">
+        <strong>🦅 ¡Hola! Soy el Ing. Pedro.</strong><br>
+        Si quieres conversar sobre algún tema en general, ¡escribe abajo! Si necesitas que revise información específica, ve a <b>"Gestión de Bibliografía"</b> y dame los archivos.
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Ventana de chat
+    contenedor_chat = st.container(height=380, border=True)
+
+    # Lógica de IA
+    modelo, status = conseguir_modelo_disponible()
+    if not modelo:
+        st.error(f"Error: {status}")
+        st.stop()
+    
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    with contenedor_chat:
+        avatar_bot = AVATAR_URL if os.path.exists(AVATAR_URL) else "assistant"
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"], avatar=avatar_bot if message["role"]=="assistant" else "👤"):
+                st.markdown(message["content"])
+
+    if prompt := st.chat_input("Escribe tu consulta aquí..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.rerun()
+
+    if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
         with contenedor_chat:
-            avatar_bot = AVATAR_URL if os.path.exists(AVATAR_URL) else "assistant"
-            for message in st.session_state.messages:
-                with st.chat_message(message["role"], avatar=avatar_bot if message["role"] == "assistant" else "👤"):
-                    st.markdown(message["content"])
-
-        if prompt := st.chat_input("Escribe tu consulta aquí..."):
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            st.rerun()
-
-        if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
-            with contenedor_chat:
-                with st.chat_message("assistant", avatar=avatar_bot):
-                    placeholder = st.empty()
-                    placeholder.markdown("🦅 *Procesando...*")
-                    try:
-                        textos, fuentes = leer_pdfs_locales()
-                        contexto_pdf = buscar_informacion(st.session_state.messages[-1]["content"], textos, fuentes)
-                        
-                        prompt_sistema = f"""
-                        Eres el **Ing. Pedro** (Tutor Virtual FICA - UCE).
-                        Identidad: Profesional, amable, compañero universitario.
-                        CONTEXTO: {contexto_pdf}
-                        PREGUNTA: {st.session_state.messages[-1]['content']}
-                        """
-                        model = genai.GenerativeModel(modelo)
-                        response = model.generate_content(prompt_sistema)
-                        placeholder.markdown(response.text)
-                        st.session_state.messages.append({"role": "assistant", "content": response.text})
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+            with st.chat_message("assistant", avatar=avatar_bot):
+                placeholder = st.empty()
+                placeholder.markdown("🦅 *Analizando...*")
+                try:
+                    textos, fuentes = leer_pdfs_locales()
+                    contexto = buscar_informacion(st.session_state.messages[-1]["content"], textos, fuentes)
+                    model = genai.GenerativeModel(modelo)
+                    response = model.generate_content(f"Eres el Ing. Pedro de la FICA-UCE. Contexto: {contexto}. Pregunta: {st.session_state.messages[-1]['content']}")
+                    placeholder.markdown(response.text)
+                    st.session_state.messages.append({"role": "assistant", "content": response.text})
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
 def main():
     opcion = sidebar_uce()
